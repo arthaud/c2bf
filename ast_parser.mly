@@ -11,6 +11,7 @@
 %token TInf TInfEq TEq TNotEq TSup TSupEq TAnd TOr TNot
 %token TSemicolon TComma TAssign
 %token TIf TElse TWhile TFor
+%token TReadChar TWriteChar
 %token TEOF
 
 %start nt_program
@@ -43,6 +44,7 @@ nt_statement :
     | TIf TLeftPar nt_expression TRightPar TLeftBrace nt_statements TRightBrace { If($3, $6, []) }
     | TWhile TLeftPar nt_expression TRightPar TLeftBrace nt_statements TRightBrace { While($3, $6) }
     | TFor TLeftPar nt_statement TComma nt_expression TComma nt_statement TRightPar TLeftBrace nt_statements TRightBrace { For($3, $5, $7, $10) }
+    | TWriteChar TLeftPar nt_expression TRightPar TSemicolon { WriteChar($3) }
 ;
 
 nt_expression :
@@ -64,4 +66,5 @@ nt_expression :
     | nt_expression TNotEq nt_expression { NotEq($1, $3) }
     | nt_expression TSup nt_expression { Sup($1, $3) }
     | nt_expression TSupEq nt_expression { SupEq($1, $3) }
+    | TReadChar TLeftPar TRightPar { ReadChar }
 ;

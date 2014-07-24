@@ -31,6 +31,7 @@ let rec string_of_expression = function
     |And(left, right) -> "(" ^ (string_of_expression left) ^ ") && (" ^ (string_of_expression right) ^ ")"
     |Or(left, right)  -> "(" ^ (string_of_expression left) ^ ") || (" ^ (string_of_expression right) ^ ")"
     |Not c -> "!(" ^ (string_of_expression c) ^ ")"
+    |ReadChar -> "read_char()"
 ;;
 
 let rec
@@ -55,6 +56,7 @@ string_of_statement = function
         "for (" ^ (string_of_statement init) ^ " , " ^ (string_of_expression cond) ^ " , " ^ (string_of_statement incr) ^ ") {\n\t" ^
         (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
         "\n}"
+    |WriteChar expr -> "write_char(" ^ (string_of_expression expr) ^ ");"
 and
 string_of_program = function
     |[] -> ""
@@ -119,6 +121,7 @@ let rec type_of_expression env expr =
         |And(left, right) -> type_of_binary_expr "use operator && on" Bool Bool left right
         |Or(left, right)  -> type_of_binary_expr "use operator || on" Bool Bool left right
         |Not expr -> type_of_unary_expr "use operator not on" Bool Bool expr
+        |ReadChar -> Int
 ;;
 
 let check_types =
@@ -154,6 +157,10 @@ let check_types =
             aux env q
         |For(init, cond, incr, statements)::q ->
             aux env [init; While(cond, statements @ [incr])];
+            aux env q
+        |WriteChar(expr)::q ->
+            if not(type_of_expression env expr = Int) then
+                raise (Bad_type (sprintf "read_char is expected a int, not %s." (string_of_type (type_of_expression env expr))));
             aux env q
         in
         aux [];;

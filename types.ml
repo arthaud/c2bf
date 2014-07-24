@@ -21,6 +21,7 @@ type expression =
     |And of expression * expression
     |Or of expression * expression
     |Not of expression
+    |ReadChar
 
 type statement =
     |Define of var_type * string * expression
@@ -28,5 +29,6 @@ type statement =
     |If of expression * statement list * statement list
     |While of expression * statement list
     |For of statement * expression * statement * statement list
+    |WriteChar of expression
 
 type program = statement list

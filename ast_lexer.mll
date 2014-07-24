@@ -36,5 +36,7 @@ rule tokenize = parse
     | (digit+ as num)                         { TIntConst(int_of_string num) }
     | "true"                                  { TBoolConst(true) }
     | "false"                                 { TBoolConst(false) }
+    | "read_char"                             { TReadChar }
+    | "write_char"                            { TWriteChar }
     | ident as var_name                       { TVar(var_name) }
     | eof                                     { TEOF }
