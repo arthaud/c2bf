@@ -1,7 +1,7 @@
 all: build
 
 build:
-	ocamlbuild -pkg str ctobf.top
+	ocamlbuild -pkg str c2bf.top
 
 clean:
 	ocamlbuild -clean
