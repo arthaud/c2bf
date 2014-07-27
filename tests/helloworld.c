@@ -1,0 +1,14 @@
+write_char('H');
+write_char('e');
+write_char('l');
+write_char('l');
+write_char('o');
+write_char(' ');
+write_char('w');
+write_char('o');
+write_char('r');
+write_char('l');
+write_char('d');
+write_char(' ');
+write_char('!');
+write_char('\n');
