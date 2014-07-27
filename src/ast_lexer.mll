@@ -7,6 +7,8 @@ let ident = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule tokenize = parse
     | [' ' '\t' '\n' '\r']                    { tokenize lexbuf }
+    | "//"                                    { inline_comment lexbuf }
+    | "/*"                                    { multiline_comment 1 lexbuf }
     | "int"                                   { TInt }
     | "bool"                                  { TBool }
     | '('                                     { TLeftPar }
@@ -44,3 +46,14 @@ rule tokenize = parse
     | "write_char"                            { TWriteChar }
     | ident as var_name                       { TVar(var_name) }
     | eof                                     { TEOF }
+and
+inline_comment = parse
+    | '\n'                                    { tokenize lexbuf }
+    | eof                                     { TEOF }
+    | _                                       { inline_comment lexbuf }
+and
+multiline_comment depth = parse
+    | "*/"                                    { if depth = 1 then tokenize lexbuf else multiline_comment (depth - 1) lexbuf }
+    | "/*"                                    { multiline_comment (depth + 1) lexbuf }
+    | eof                                     { TEOF }
+    | _                                       { multiline_comment depth lexbuf }
