@@ -5,6 +5,7 @@
 %token <string> TVar
 %token <int> TIntConst
 %token <bool> TBoolConst
+%token <char> TCharConst
 %token TInt TBool
 %token TLeftPar TRightPar TLeftBrace, TRightBrace
 %token TPlus TMinus TMul TDiv
@@ -52,6 +53,7 @@ nt_expression :
     | TVar { Var($1) }
     | TIntConst { Const(IntConst($1)) }
     | TBoolConst { Const(BoolConst($1)) }
+    | TCharConst { Const(CharConst($1)) }
     | TMinus nt_expression %prec TNeg { Minus($2) }
     | nt_expression TPlus nt_expression { Add($1, $3) }
     | nt_expression TMinus nt_expression { Sub($1, $3) }

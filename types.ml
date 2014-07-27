@@ -3,6 +3,7 @@ type var_type = Int | Bool
 type constant =
     |IntConst of int
     |BoolConst of bool
+    |CharConst of char
 
 type expression =
     |Var of string

@@ -13,6 +13,7 @@ let string_of_constant = function
     |IntConst x -> string_of_int x
     |BoolConst true -> "true"
     |BoolConst false -> "false"
+    |CharConst c -> sprintf "'%c'" c
 
 let rec string_of_expression = function
     |Var name -> name
@@ -83,6 +84,7 @@ let type_of_var env name = List.assoc name env;;
 let type_of_constant = function
     |IntConst _ -> Int
     |BoolConst _ -> Bool
+    |CharConst _ -> Int
 ;;
 
 let rec type_of_expression env expr =

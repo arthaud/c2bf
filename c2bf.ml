@@ -235,6 +235,7 @@ let program_to_brainfuck prog =
         |Const(IntConst x) -> Goto(pos)::(repeat Incr x)
         |Const(BoolConst true) -> [Goto(pos); Incr]
         |Const(BoolConst false) -> []
+        |Const(CharConst c) -> Goto(pos)::(repeat Incr (int_of_char c))
 
         (* operators *)
         |Add(left, right) ->
