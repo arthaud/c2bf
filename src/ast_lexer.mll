@@ -37,6 +37,9 @@ rule tokenize = parse
     | "true"                                  { TBoolConst(true) }
     | "false"                                 { TBoolConst(false) }
     | '\'' (_ as c) '\''                      { TCharConst(c) }
+    | "'\\t'"                                 { TCharConst('\t') }
+    | "'\\n'"                                 { TCharConst('\n') }
+    | "'\\r'"                                 { TCharConst('\r') }
     | "read_char"                             { TReadChar }
     | "write_char"                            { TWriteChar }
     | ident as var_name                       { TVar(var_name) }
