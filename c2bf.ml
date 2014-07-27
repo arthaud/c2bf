@@ -341,3 +341,19 @@ let program_to_brainfuck prog =
             bf_for @ bf_clean_for @ bf_end, offset_end
     in
     fst (compile_program [] 0 prog)
+
+let usage = "usage: c2bf [options] <source-file>"
+
+let main filename =
+    let lexbuf = Lexing.from_channel (open_in filename) in
+    let prog = program_of_lexbuf lexbuf in
+
+    if !Options.type_checking then
+        check_types prog;
+
+    let bf = compile_brainfuck (program_to_brainfuck prog) in
+    let out = open_out !Options.output in
+    output_string out bf
+
+let _ =
+    Arg.parse Options.options main usage
