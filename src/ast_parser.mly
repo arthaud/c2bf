@@ -52,6 +52,16 @@ nt_function_parameters_list :
     | TComma nt_type TVar nt_function_parameters_list { ($2, $3)::$4 }
 ;
 
+nt_function_arguments :
+    | { [] }
+    | nt_expression nt_function_arguments_list { $1::$2 }
+;
+
+nt_function_arguments_list :
+    | { [] }
+    | TComma nt_expression nt_function_arguments_list { $2::$3 }
+;
+
 nt_statement : 
     | nt_type TVar TAssign nt_expression TSemicolon { Define($1, $2, $4) }
     | TVar TAssign nt_expression TSemicolon { Assign($1, $3) }
@@ -63,6 +73,7 @@ nt_statement :
     | TLeftBrace nt_statements TRightBrace { Block($2) }
     | nt_type TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TReturn nt_expression TSemicolon TRightBrace { Function(Some ($1, $9), $2, $4, $7) }
     | TVoid TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TRightBrace { Function(None, $2, $4, $7) }
+    | TVar TLeftPar nt_function_arguments TRightPar TSemicolon { CallProcedure($1, $3) }
 ;
 
 nt_expression :
@@ -86,4 +97,5 @@ nt_expression :
     | nt_expression TSup nt_expression { Sup($1, $3) }
     | nt_expression TSupEq nt_expression { SupEq($1, $3) }
     | TReadChar TLeftPar TRightPar { ReadChar }
+    | TVar TLeftPar nt_function_arguments TRightPar { Call($1, $3) }
 ;

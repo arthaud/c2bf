@@ -23,6 +23,7 @@ type expression =
     |Or of expression * expression
     |Not of expression
     |ReadChar
+    |Call of string * expression list
 
 type function_parameters = (var_type * string) list
 
@@ -36,5 +37,6 @@ type statement =
     |Block of statement list
     |Function of (var_type * expression) option * string * function_parameters * statement list
               (* (returned type, returned expression), name, parameters, instructions *)
+    |CallProcedure of string * expression list
 
 type program = statement list

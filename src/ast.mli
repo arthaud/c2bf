@@ -18,11 +18,15 @@ val program_of_lexbuf : Lexing.lexbuf -> program
 val program_of_string : string -> program
 
 (* check functions *)
-type environment = (string * var_type) list
+type environment_type =
+    |BasicType of var_type
+    |FunctionType of (var_type option) * (var_type list)
+
+type environment = (string * environment_type) list
 exception Bad_type of string
 
 (* throws a Not_found exception when the variable is not in the environment *)
-val type_of_var : environment -> string -> var_type
+val type_of_var : environment -> string -> environment_type
 
 val type_of_constant : constant -> var_type
 

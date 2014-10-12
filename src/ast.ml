@@ -33,11 +33,18 @@ let rec string_of_expression = function
     |Or(left, right)  -> "(" ^ (string_of_expression left) ^ ") || (" ^ (string_of_expression right) ^ ")"
     |Not c -> "!(" ^ (string_of_expression c) ^ ")"
     |ReadChar -> "read_char()"
+    |Call(name, arguments) -> name ^ "(" ^ (string_of_function_arguments arguments) ^ ")"
+and
+string_of_function_arguments = function
+    |[] -> ""
+    |t::[] -> string_of_expression t
+    |t::q -> (string_of_expression t) ^ ", " ^ (string_of_function_arguments q)
 ;;
 
-let string_of_function_parameters = function
+let rec string_of_function_parameters = function
     |[] -> ""
-    |(var_t, name)::q -> (string_of_type var_t) ^ " " ^ name ^ (List.fold_left (fun s (var_t, name) -> s ^ ", " ^ (string_of_type var_t) ^ " " ^ name) "" q)
+    |(var_t, name)::[] -> (string_of_type var_t) ^ " " ^ name
+    |(var_t, name)::q -> (string_of_type var_t) ^ " " ^ name ^ ", " ^ (string_of_function_parameters q)
 ;;
 
 let rec
@@ -76,6 +83,7 @@ string_of_statement = function
         (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
         "\n\treturn " ^ (string_of_expression returned_expr) ^ ";" ^
         "\n}"
+    |CallProcedure(name, arguments) -> name ^ "(" ^ (string_of_function_arguments arguments) ^ ");"
 and
 string_of_program = function
     |[] -> ""
@@ -95,7 +103,11 @@ let program_of_lexbuf lexbuf = nt_program tokenize lexbuf;;
 let program_of_string src = program_of_lexbuf (Lexing.from_string src);;
 
 (* check functions *)
-type environment = (string * var_type) list
+type environment_type =
+    |BasicType of var_type
+    |FunctionType of (var_type option) * (var_type list)
+
+type environment = (string * environment_type) list
 exception Bad_type of string
 
 let type_of_var env name = List.assoc name env;;
@@ -104,6 +116,32 @@ let type_of_constant = function
     |IntConst _ -> Int
     |BoolConst _ -> Bool
     |CharConst _ -> Int
+;;
+
+let is_function = function
+    |FunctionType _ -> true
+    |_ -> false
+
+(* check_function_parameters : (var_type * string) list -> unit *)
+let check_function_parameters =
+    let rec aux params = function
+        |[] -> ()
+        |(_, name)::q ->
+            if List.exists (fun x -> x = name) params then
+                raise (Bad_type (sprintf "parameter %s already defined." name))
+            else
+                aux (name::params) q
+    in
+    aux []
+;;
+
+(* check_function_arguments : string -> var_type list * var_type list -> unit *)
+let rec check_function_arguments name = function
+    |[], [] -> ()
+    |[], _ -> raise (Bad_type (sprintf "too many arguments for function %s" name))
+    |_, [] -> raise (Bad_type (sprintf "too few arguments for function %s" name))
+    |t1::q1, t2::q2 when (t1 = t2) -> check_function_arguments name (q1, q2)
+    |t1::q1, t2::q2 -> raise (Bad_type (sprintf "bad argument for function %s : expected %s, found %s" name (string_of_type t1) (string_of_type t2)))
 ;;
 
 let rec type_of_expression env expr =
@@ -123,7 +161,9 @@ let rec type_of_expression env expr =
         |Var name ->
             (
             try
-                type_of_var env name
+                match (type_of_var env name) with
+                |BasicType t -> t
+                |FunctionType _ -> raise (Bad_type (sprintf "cannot use function %s as a value" name))
             with Not_found ->
                 raise (Bad_type (sprintf "variable %s is not defined" name))
             )
@@ -143,18 +183,19 @@ let rec type_of_expression env expr =
         |Or(left, right)  -> type_of_binary_expr "use operator || on" Bool Bool left right
         |Not expr -> type_of_unary_expr "use operator not on" Bool Bool expr
         |ReadChar -> Int
-;;
-
-let check_function_parameters =
-    let rec aux params = function
-        |[] -> ()
-        |(_, name)::q ->
-            if List.exists (fun x -> x = name) params then
-                raise (Bad_type (sprintf "parameter %s already defined." name))
-            else
-                aux (name::params) q
-    in
-    aux []
+        |Call(name, arguments) ->
+            (
+            try
+                match (type_of_var env name) with
+                |BasicType _ -> raise (Bad_type (sprintf "cannot use variable %s as a function" name))
+                |FunctionType(None, _) -> raise (Bad_type (sprintf "function %s returns void in an expression" name))
+                |FunctionType(Some(returned_type), arguments_types) ->
+                    let arguments_real_types = List.map (type_of_expression env) arguments in
+                    check_function_arguments name (arguments_types, arguments_real_types);
+                    returned_type
+            with Not_found ->
+                raise (Bad_type (sprintf "function %s is not defined" name))
+            )
 ;;
 
 let check_types =
@@ -164,19 +205,20 @@ let check_types =
             if List.mem_assoc name env then
                 raise (Bad_type (sprintf "variable %s already defined." name))
             else if not(var_t = type_of_expression env expr) then
-                raise (Bad_type (sprintf "expression of type %s cannot be assigned to variable %s of type %s." (string_of_type (type_of_expression env expr)) name (string_of_type var_t)))
-            else aux ((name, var_t)::env) q
+                raise (Bad_type (sprintf "expression of type %s cannot be assigned to variable %s of type %s." (string_of_type (type_of_expression env expr)) name (string_of_type var_t)));
+            aux ((name, BasicType var_t)::env) q
         |Assign(name, expr)::q ->
             (
             try
-                let var_t = type_of_var env name in
-                if not(var_t = type_of_expression env expr) then
-                    raise (Bad_type (sprintf "expression of type %s cannot be assigned to variable %s of type %s." (string_of_type (type_of_expression env expr)) name (string_of_type var_t)))
-                else
-                    aux env q
+                match (type_of_var env name) with
+                |FunctionType _ -> raise (Bad_type (sprintf "%s is not a variable" name))
+                |BasicType var_t ->
+                    if not(var_t = type_of_expression env expr) then
+                        raise (Bad_type (sprintf "expression of type %s cannot be assigned to variable %s of type %s." (string_of_type (type_of_expression env expr)) name (string_of_type var_t)))
             with Not_found ->
                 raise (Bad_type (sprintf "variable %s is not defined." name))
-            )
+            );
+            aux env q
         |If(cond, statements_true, statements_false)::q ->
             if not(type_of_expression env cond = Bool) then
                 raise (Bad_type (sprintf "type %s cannot be used as a condition." (string_of_type (type_of_expression env cond))));
@@ -200,13 +242,27 @@ let check_types =
             aux env q
         |Function(None, name, parameters, statements)::q ->
             check_function_parameters parameters;
-            let function_env = List.map (fun (var_t, name) -> (name, var_t)) parameters in
+            let function_env = (List.map (fun (var_t, name) -> (name, BasicType var_t)) parameters) @ (List.filter (fun (_, t) -> is_function t) env) in
             aux function_env statements;
-            aux env q
+            let new_env = (name, FunctionType(None, List.map (function (var_t, _) -> var_t) parameters))::env in
+            aux new_env q
         |Function(Some(var_t, returned_expr), name, parameters, statements)::q ->
             check_function_parameters parameters;
-            let function_env = List.map (fun (var_t, name) -> (name, var_t)) parameters in
+            let function_env = (List.map (fun (var_t, name) -> (name, BasicType var_t)) parameters) @ (List.filter (fun (_, t) -> is_function t) env) in
             aux function_env (statements @ [Define(var_t, "_return", returned_expr)]);
+            let new_env = (name, FunctionType(Some(var_t), List.map (function (var_t, _) -> var_t) parameters))::env in
+            aux new_env q
+        |CallProcedure(name, arguments)::q ->
+            (
+            try
+                match (type_of_var env name) with
+                |BasicType _ -> raise (Bad_type (sprintf "cannot use variable %s as a function" name))
+                |FunctionType(_, arguments_types) ->
+                    let arguments_real_types = List.map (type_of_expression env) arguments in
+                    check_function_arguments name (arguments_types, arguments_real_types)
+            with Not_found ->
+                raise (Bad_type (sprintf "function %s is not defined" name))
+            );
             aux env q
         in
         aux [];;

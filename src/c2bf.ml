@@ -291,6 +291,7 @@ let program_to_brainfuck prog =
             let expr_bf = compile_expression symbols_table pos expr in
             expr_bf @ bf_not pos (pos + 1)
         |ReadChar -> [Goto(pos); In]
+        |Call _ -> failwith "cannot compile function calls"
     in
     (* compile the program : (string * int) list -> int -> brainfuck * int *)
     let rec compile_program symbols_table offset = function
@@ -345,7 +346,9 @@ let program_to_brainfuck prog =
             let bf_end, offset_end = compile_program symbols_table offset q in
             bf_statements @ bf_clean_statements @ bf_end, offset_end
         |Function(_)::q ->
-            compile_program symbols_table offset q
+            failwith "cannot compile functions"
+        |CallProcedure(_)::q ->
+            failwith "cannot compile function calls"
     in
     fst (compile_program [] 0 prog)
 
