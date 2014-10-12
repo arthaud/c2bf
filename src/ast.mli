@@ -35,3 +35,6 @@ val type_of_expression : environment -> expression -> var_type
 
 (* throws a Bad_type exception when the program is uncorrectly typed *)
 val check_types : program -> unit
+
+(* inline a program *)
+val inline : program -> program

@@ -358,11 +358,20 @@ let main filename =
     let lexbuf = Lexing.from_channel (open_in filename) in
     let prog = program_of_lexbuf lexbuf in
 
+    (* debug *)
     if !Options.debug then
         printf "### Abstract Syntax Tree ###\n%s\n" (string_of_program prog);
 
+    (* type checking *)
     if !Options.type_checking then
         check_types prog;
+
+    (* inlining *)
+    let prog = inline prog in
+
+    (* debug *)
+    if !Options.debug then
+        printf "### Inlined Abstract Syntax Tree ###\n%s\n" (string_of_program prog);
 
     let bf = compile_brainfuck (program_to_brainfuck prog) in
     let out = open_out !Options.output in

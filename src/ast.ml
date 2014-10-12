@@ -189,9 +189,9 @@ let rec type_of_expression env expr =
                 match (type_of_var env name) with
                 |BasicType _ -> raise (Bad_type (sprintf "cannot use variable %s as a function" name))
                 |FunctionType(None, _) -> raise (Bad_type (sprintf "function %s returns void in an expression" name))
-                |FunctionType(Some(returned_type), arguments_types) ->
+                |FunctionType(Some(returned_type), parameters_types) ->
                     let arguments_real_types = List.map (type_of_expression env) arguments in
-                    check_function_arguments name (arguments_types, arguments_real_types);
+                    check_function_arguments name (parameters_types, arguments_real_types);
                     returned_type
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
@@ -257,12 +257,252 @@ let check_types =
             try
                 match (type_of_var env name) with
                 |BasicType _ -> raise (Bad_type (sprintf "cannot use variable %s as a function" name))
-                |FunctionType(_, arguments_types) ->
+                |FunctionType(Some(_), _) -> raise (Bad_type (sprintf "function %s cannot be used as a procedure" name))
+                |FunctionType(None, parameters_types) ->
                     let arguments_real_types = List.map (type_of_expression env) arguments in
-                    check_function_arguments name (arguments_types, arguments_real_types)
+                    check_function_arguments name (parameters_types, arguments_real_types)
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
             );
             aux env q
         in
-        aux [];;
+        aux []
+;;
+
+(* rename_variable_expr : string -> string -> expression -> expression
+ *
+ * replace a variable name in a expression
+ *)
+let rename_variable_expr old_name new_name =
+    let rec aux = function
+        |Const cst -> Const cst
+        |ReadChar -> ReadChar
+        |Var name when (name = old_name) -> Var new_name
+        |Var name -> Var name
+        |Minus e -> Minus (aux e)
+        |Not e -> Not (aux e)
+        |Add(left, right) -> Add(aux left, aux right)
+        |Sub(left, right) -> Sub(aux left, aux right)
+        |Mul(left, right) -> Mul(aux left, aux right)
+        |Div(left, right) -> Div(aux left, aux right)
+        |Inf(left, right)   -> Inf(aux left, aux right)
+        |InfEq(left, right) -> InfEq(aux left, aux right)
+        |Eq(left, right)    -> Eq(aux left, aux right)
+        |NotEq(left, right) -> NotEq(aux left, aux right)
+        |Sup(left, right)   -> Sup(aux left, aux right)
+        |SupEq(left, right) -> SupEq(aux left, aux right)
+        |And(left, right) -> And(aux left, aux right)
+        |Or(left, right)  -> Or(aux left, aux right)
+        |Call(name, arguments) -> Call(name, List.map aux arguments)
+    in aux
+;;
+
+(* rename_variable_statement : string -> string -> statement -> statement
+ *
+ * replace a variable name in a statement, ignoring functions
+ *)
+let rec rename_variable_statement old_name new_name = function
+    |Define(var_t, name, expr) when (name = old_name) -> Define(var_t, new_name, rename_variable_expr old_name new_name expr)
+    |Define(var_t, name, expr) -> Define(var_t, name, rename_variable_expr old_name new_name expr)
+    |Assign(name, expr) when (name = old_name) -> Assign(new_name, rename_variable_expr old_name new_name expr)
+    |Assign(name, expr) -> Assign(name, rename_variable_expr old_name new_name expr)
+    |If(cond, statements_true, statements_false) -> If(rename_variable_expr old_name new_name cond, rename_variable_prog old_name new_name statements_true, rename_variable_prog old_name new_name statements_false)
+    |While(cond, statements) -> While(rename_variable_expr old_name new_name cond, rename_variable_prog old_name new_name statements)
+    |For(init, cond, incr, statements) -> For(rename_variable_statement old_name new_name init, rename_variable_expr old_name new_name cond, rename_variable_statement old_name new_name incr, rename_variable_prog old_name new_name statements)
+    |WriteChar(expr) -> WriteChar(rename_variable_expr old_name new_name expr)
+    |Block(statements) -> Block(rename_variable_prog old_name new_name statements)
+    |Function(return, name, parameters, statements) -> Function(return, name, parameters, statements)
+    |CallProcedure(name, arguments) -> CallProcedure(name, List.map (rename_variable_expr old_name new_name) arguments)
+
+(* rename_variable_prog : string -> string -> program -> program
+ *
+ * replace a variable name in a program, ignoring functions
+ *)
+and rename_variable_prog old_name new_name p = List.map (rename_variable_statement old_name new_name) p
+;;
+
+(* default_value : var_type -> constant *)
+let default_value = function
+    |Int -> IntConst 0
+    |Bool -> BoolConst(false)
+;;
+
+type function_value = (var_type * expression) option * function_parameters * statement list
+type inline_environment = (string * function_value) list
+
+(*
+ * inline : program -> program
+ *
+ * remove all functions, assuming that the program is well typed
+ *)
+let inline =
+    (* for temporary variables in expressions *)
+    let tmp_counter = ref 0 in
+
+    let get_tmp_var () =
+        incr tmp_counter;
+        sprintf "%d_tmp" (!tmp_counter)
+    in
+
+    (* for local variables inside functions *)
+    let call_counter = ref 0 in
+
+    let name_local_var call_id name = sprintf "%d_loc_%s" call_id name in
+
+    (* inline_expression : inline_environment -> expression -> program * expression *)
+    let rec inline_expression env expr =
+        let inline_unary_expr expr construct =
+            let pre_expr, new_expr = inline_expression env expr in
+            pre_expr, construct new_expr
+        in
+        let inline_binary_expr left right construct =
+            let pre_left, new_left = inline_expression env left in
+            let pre_right, new_right = inline_expression env right in
+            pre_left @ pre_right, construct new_left new_right
+        in
+        match expr with
+        |Const cst -> [], expr
+        |ReadChar -> [], expr
+        |Var name -> [], Var name
+        |Minus e -> inline_unary_expr e (fun x -> Minus x)
+        |Not e -> inline_unary_expr e (fun x -> Not e)
+        |Add(left, right) -> inline_binary_expr left right (fun x y -> Add(x, y))
+        |Sub(left, right) -> inline_binary_expr left right (fun x y -> Sub(x, y))
+        |Mul(left, right) -> inline_binary_expr left right (fun x y -> Mul(x, y))
+        |Div(left, right) -> inline_binary_expr left right (fun x y -> Div(x, y))
+        |Inf(left, right)   -> inline_binary_expr left right (fun x y -> Inf(x, y))
+        |InfEq(left, right) -> inline_binary_expr left right (fun x y -> InfEq(x, y))
+        |Eq(left, right)    -> inline_binary_expr left right (fun x y -> Eq(x, y))
+        |NotEq(left, right) -> inline_binary_expr left right (fun x y -> NotEq(x, y))
+        |Sup(left, right)   -> inline_binary_expr left right (fun x y -> Sup(x, y))
+        |SupEq(left, right) -> inline_binary_expr left right (fun x y -> SupEq(x, y))
+        |And(left, right) -> inline_binary_expr left right (fun x y -> And(x, y))
+        |Or(left, right)  -> inline_binary_expr left right (fun x y -> Or(x, y))
+        |Call(name, arguments) ->
+            (
+            try
+                match (List.assoc name env) with
+                |None, _, _ -> raise (Bad_type (sprintf "function %s returns void in an expression" name))
+                |Some(returned_type, returned_expr), parameters_types, statements ->
+                    (* update call counter *)
+                    incr call_counter;
+                    let call_id = !call_counter in
+
+                    (* build initialization statements : `type argument = expr;` *)
+                    let pre_function = function_init_arguments call_id env (parameters_types, arguments) in
+
+                    (* put the result in a temporary var *)
+                    let tmp = get_tmp_var () in
+                    let function_body = statements @ [Define(returned_type, tmp, returned_expr)] in
+
+                    (* replace argument variable names *)
+                    let function_body = List.fold_left (fun prog (_, name) -> rename_variable_prog name (name_local_var call_id name) prog) function_body parameters_types in
+
+                    (* inline function body *)
+                    let function_body = inline_program call_id env function_body in
+
+                    pre_function @ function_body, Var tmp
+
+            with Not_found ->
+                raise (Bad_type (sprintf "function %s is not defined" name))
+            )
+
+    (* function_init_arguments : int -> inline_environment -> ((var_type * string) list) * (expression list) *)
+    and function_init_arguments call_id env = function
+        |[], [] -> []
+        |[], _ -> raise (Bad_type (sprintf "too many arguments for call %d" call_id))
+        |_, [] -> raise (Bad_type (sprintf "too few arguments for call %d" call_id))
+        |(var_t, name)::q1, expr::q2 ->
+            let pre_expr, new_expr = inline_expression env expr in
+            pre_expr @ [Define(var_t, name_local_var call_id name, new_expr)] @ (function_init_arguments call_id env (q1, q2))
+
+    (* inline_program : int -> inline_environment -> program -> program *)
+    and inline_program call_id env = function
+        |[] -> []
+        |Define(var_t, name, expr)::q ->
+            let new_name = (match name.[0] with
+                |'0'..'9' -> name (* don't replace name *)
+                |_ -> name_local_var call_id name
+            ) in
+            let pre_expr, new_expr = inline_expression env expr in
+            let inlined_q = inline_program call_id env (rename_variable_prog name new_name q) in
+
+            if pre_expr = [] then
+                Define(var_t, new_name, new_expr)::inlined_q
+            else
+                Define(var_t, new_name, Const(default_value var_t))::Block(pre_expr @ [Assign(new_name, new_expr)])::inlined_q
+        |Assign(name, expr)::q ->
+            let pre_expr, new_expr = inline_expression env expr in
+            let inlined_q = inline_program call_id env q in
+
+            if pre_expr = [] then
+                Assign(name, new_expr)::inlined_q
+            else
+                Block(pre_expr @ [Assign(name, new_expr)])::inlined_q
+        |If(cond, statements_true, statements_false)::q ->
+            let pre_cond, new_cond = inline_expression env cond in
+            let inlined_statements_true = inline_program call_id env statements_true in
+            let inlined_statements_false = inline_program call_id env statements_false in
+            let inlined_q = inline_program call_id env q in
+
+            if pre_cond = [] then
+                If(new_cond, inlined_statements_true, inlined_statements_false)::inlined_q
+            else
+                Block(pre_cond @ [If(new_cond, inlined_statements_true, inlined_statements_false)])::inlined_q
+        |While(cond, statements)::q ->
+            let pre_cond, new_cond = inline_expression env cond in
+            let inlined_statements = inline_program call_id env statements in
+            let inlined_q = inline_program call_id env q in
+
+            if pre_cond = [] then
+                While(new_cond, inlined_statements)::inlined_q
+            else
+                (* replace define that are not in a block (if, while, for, block) *)
+                let replace_define = function
+                    |Define(var_t, name, expr) -> Assign(name, expr)
+                    |x -> x
+                in
+                let pre_cond_without_define = List.map replace_define pre_cond in
+                Block(pre_cond @ [While(new_cond, inlined_statements @ pre_cond_without_define)])::inlined_q
+        |For(init, cond, incr, statements)::q ->
+            inline_program call_id env (Block([init; While(cond, statements @ [incr])])::q)
+        |WriteChar(expr)::q ->
+            let pre_expr, new_expr = inline_expression env expr in
+            let inlined_q = inline_program call_id env q in
+
+            if pre_expr = [] then
+                WriteChar(new_expr)::inlined_q
+            else
+                Block(pre_expr @ [WriteChar(new_expr)])::inlined_q
+        |Block(statements)::q ->
+            let inlined_statements = inline_program call_id env statements in
+            let inlined_q = inline_program call_id env q in
+
+            Block(inlined_statements)::inlined_q
+        |Function(return, name, parameters, statements)::q ->
+            inline_program call_id ((name, (return, parameters, statements))::env) q
+        |CallProcedure(name, arguments)::q ->
+            (
+            try
+                match (List.assoc name env) with
+                |Some(_), _, _ -> raise (Bad_type (sprintf "function %s cannot be used as a procedure" name))
+                |None, parameters_types, statements ->
+                    (* update call counter *)
+                    incr call_counter;
+                    let new_call_id = !call_counter in
+
+                    (* build initialization statements : `type argument = expr;` *)
+                    let pre_function = function_init_arguments new_call_id env (parameters_types, arguments) in
+
+                    (* replace argument variable names *)
+                    let function_body = List.fold_left (fun prog (_, name) -> rename_variable_prog name (name_local_var new_call_id name) prog) statements parameters_types in
+
+                    (* inline function body *)
+                    let function_body = inline_program new_call_id env function_body in
+
+                    Block(pre_function @ function_body)::(inline_program call_id env q)
+            with Not_found ->
+                raise (Bad_type (sprintf "function %s is not defined" name))
+            )
+    in
+    inline_program (!call_counter) []
