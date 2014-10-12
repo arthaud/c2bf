@@ -87,10 +87,31 @@ let bf_move src dst = [Goto(src); OBrac; Goto(dst); Incr; Goto(src); Decr; CBrac
  * copy the value from src to dst
  *
  * precondition: dst = 0 && temp = 0
- * condition: src = src' = dst' && temp' = 0 *)
+ * postcondition: src = src' = dst' && temp' = 0 *)
 let bf_copy src dst temp = [
     Goto(src); OBrac; Goto(dst); Incr; Goto(temp); Incr; Goto(src); Decr; CBrac;
     Goto(temp); OBrac; Goto(src); Incr; Goto(temp); Decr; CBrac]
+
+(* bf_generate : int -> int -> brainfuck
+ * generate the value `value` at position `pos`
+ *
+ * precondition: for all x >= pos, V[x] = 0
+ * postcondition: V[pos] = value and for all x > pos V[x] = 0 *)
+let bf_generate value pos =
+    if !Options.optimization <= 1 then
+        Goto(pos)::(repeat Incr value)
+    else
+        let rec decompose value base =
+            let r = value mod base in
+            let q = (value - r) / base in
+            if q <= 1 then
+                repeat Incr value
+            else
+                let bf = decompose q base in
+                [Right] @ bf @ [OBrac; Left] @ (repeat Incr base) @ [Right; Decr; CBrac; Left] @ (repeat Incr r)
+        in
+        Goto(pos)::(decompose value 10)
+
 
 (* bf_add : int -> int -> brainfuck
  * add y to x
@@ -232,10 +253,10 @@ let program_to_brainfuck prog =
             bf_copy var_pos pos (pos + 1)
 
         (* constants *)
-        |Const(IntConst x) -> Goto(pos)::(repeat Incr x)
+        |Const(IntConst x) -> bf_generate x pos
         |Const(BoolConst true) -> [Goto(pos); Incr]
         |Const(BoolConst false) -> []
-        |Const(CharConst c) -> Goto(pos)::(repeat Incr (int_of_char c))
+        |Const(CharConst c) -> bf_generate (int_of_char c) pos
 
         (* operators *)
         |Add(left, right) ->
