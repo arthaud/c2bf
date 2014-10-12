@@ -58,6 +58,10 @@ string_of_statement = function
         (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
         "\n}"
     |WriteChar expr -> "write_char(" ^ (string_of_expression expr) ^ ");"
+    |Block(statements) ->
+        "{\n\t" ^
+        (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
+        "\n}"
 and
 string_of_program = function
     |[] -> ""
@@ -163,6 +167,9 @@ let check_types =
         |WriteChar(expr)::q ->
             if not(type_of_expression env expr = Int) then
                 raise (Bad_type (sprintf "read_char is expected a int, not %s." (string_of_type (type_of_expression env expr))));
+            aux env q
+        |Block(statements)::q ->
+            aux env statements;
             aux env q
         in
         aux [];;

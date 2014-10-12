@@ -37,15 +37,20 @@ nt_statements :
     | nt_statement nt_statements { $1::$2 }
 ;
 
+nt_type :
+    | TInt { Int }
+    | TBool { Bool }
+;
+
 nt_statement : 
-    | TInt TVar TAssign nt_expression TSemicolon { Define(Int, $2, $4) }
-    | TBool TVar TAssign nt_expression TSemicolon { Define(Bool, $2, $4) }
+    | nt_type TVar TAssign nt_expression TSemicolon { Define($1, $2, $4) }
     | TVar TAssign nt_expression TSemicolon { Assign($1, $3) }
     | TIf TLeftPar nt_expression TRightPar TLeftBrace nt_statements TRightBrace TElse TLeftBrace nt_statements TRightBrace { If($3, $6, $10) }
     | TIf TLeftPar nt_expression TRightPar TLeftBrace nt_statements TRightBrace { If($3, $6, []) }
     | TWhile TLeftPar nt_expression TRightPar TLeftBrace nt_statements TRightBrace { While($3, $6) }
     | TFor TLeftPar nt_statement TComma nt_expression TComma nt_statement TRightPar TLeftBrace nt_statements TRightBrace { For($3, $5, $7, $10) }
     | TWriteChar TLeftPar nt_expression TRightPar TSemicolon { WriteChar($3) }
+    | TLeftBrace nt_statements TRightBrace { Block($2) }
 ;
 
 nt_expression :

@@ -31,5 +31,6 @@ type statement =
     |While of expression * statement list
     |For of statement * expression * statement * statement list
     |WriteChar of expression
+    |Block of statement list
 
 type program = statement list
