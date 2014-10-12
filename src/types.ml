@@ -24,6 +24,8 @@ type expression =
     |Not of expression
     |ReadChar
 
+type function_parameters = (var_type * string) list
+
 type statement =
     |Define of var_type * string * expression
     |Assign of string * expression
@@ -32,5 +34,7 @@ type statement =
     |For of statement * expression * statement * statement list
     |WriteChar of expression
     |Block of statement list
+    |Function of (var_type * expression) option * string * function_parameters * statement list
+              (* (returned type, returned expression), name, parameters, instructions *)
 
 type program = statement list

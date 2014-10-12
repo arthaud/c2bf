@@ -6,11 +6,11 @@
 %token <int> TIntConst
 %token <bool> TBoolConst
 %token <char> TCharConst
-%token TInt TBool
+%token TVoid TInt TBool
 %token TLeftPar TRightPar TLeftBrace, TRightBrace
 %token TPlus TMinus TMul TDiv
 %token TInf TInfEq TEq TNotEq TSup TSupEq TAnd TOr TNot
-%token TSemicolon TComma TAssign
+%token TSemicolon TComma TAssign TReturn
 %token TIf TElse TWhile TFor
 %token TReadChar TWriteChar
 %token TEOF
@@ -42,6 +42,16 @@ nt_type :
     | TBool { Bool }
 ;
 
+nt_function_parameters :
+    | { [] }
+    | nt_type TVar nt_function_parameters_list { ($1, $2)::$3 }
+;
+
+nt_function_parameters_list :
+    | { [] }
+    | TComma nt_type TVar nt_function_parameters_list { ($2, $3)::$4 }
+;
+
 nt_statement : 
     | nt_type TVar TAssign nt_expression TSemicolon { Define($1, $2, $4) }
     | TVar TAssign nt_expression TSemicolon { Assign($1, $3) }
@@ -51,6 +61,8 @@ nt_statement :
     | TFor TLeftPar nt_statement TComma nt_expression TComma nt_statement TRightPar TLeftBrace nt_statements TRightBrace { For($3, $5, $7, $10) }
     | TWriteChar TLeftPar nt_expression TRightPar TSemicolon { WriteChar($3) }
     | TLeftBrace nt_statements TRightBrace { Block($2) }
+    | nt_type TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TReturn nt_expression TSemicolon TRightBrace { Function(Some ($1, $9), $2, $4, $7) }
+    | TVoid TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TRightBrace { Function(None, $2, $4, $7) }
 ;
 
 nt_expression :

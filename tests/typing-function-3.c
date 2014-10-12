@@ -1,0 +1,3 @@
+int f() {
+    return true;
+}

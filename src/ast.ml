@@ -35,6 +35,11 @@ let rec string_of_expression = function
     |ReadChar -> "read_char()"
 ;;
 
+let string_of_function_parameters = function
+    |[] -> ""
+    |(var_t, name)::q -> (string_of_type var_t) ^ " " ^ name ^ (List.fold_left (fun s (var_t, name) -> s ^ ", " ^ (string_of_type var_t) ^ " " ^ name) "" q)
+;;
+
 let rec
 string_of_statement = function
     |Define(var_t, name, expr) -> (string_of_type var_t) ^ " " ^ name ^ " = " ^ (string_of_expression expr) ^ ";"
@@ -62,6 +67,15 @@ string_of_statement = function
         "{\n\t" ^
         (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
         "\n}"
+    |Function(None, name, parameters, statements) ->
+        "void " ^ name ^ "(" ^ (string_of_function_parameters parameters) ^ ") {\n\t" ^
+        (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
+        "\n}"
+    |Function(Some(var_t, returned_expr), name, parameters, statements) ->
+        (string_of_type var_t) ^ " " ^ name ^ "(" ^ (string_of_function_parameters parameters) ^ ") {\n\t" ^
+        (global_replace (regexp "\n") "\n\t" (string_of_program statements)) ^
+        "\n\treturn " ^ (string_of_expression returned_expr) ^ ";" ^
+        "\n}"
 and
 string_of_program = function
     |[] -> ""
@@ -72,6 +86,7 @@ string_of_program = function
 let print_type vt = print_string (string_of_type vt);;
 let print_constant c = print_string (string_of_constant c);;
 let print_expression e = print_string (string_of_expression e);;
+let print_function_parameters params = print_string (string_of_function_parameters params);;
 let print_statement s = print_string (string_of_statement s);;
 let print_program p = print_string (string_of_program p);;
 
@@ -130,6 +145,18 @@ let rec type_of_expression env expr =
         |ReadChar -> Int
 ;;
 
+let check_function_parameters =
+    let rec aux params = function
+        |[] -> ()
+        |(_, name)::q ->
+            if List.exists (fun x -> x = name) params then
+                raise (Bad_type (sprintf "parameter %s already defined." name))
+            else
+                aux (name::params) q
+    in
+    aux []
+;;
+
 let check_types =
     let rec aux env = function
         |[] -> ()
@@ -170,6 +197,16 @@ let check_types =
             aux env q
         |Block(statements)::q ->
             aux env statements;
+            aux env q
+        |Function(None, name, parameters, statements)::q ->
+            check_function_parameters parameters;
+            let function_env = List.map (fun (var_t, name) -> (name, var_t)) parameters in
+            aux function_env statements;
+            aux env q
+        |Function(Some(var_t, returned_expr), name, parameters, statements)::q ->
+            check_function_parameters parameters;
+            let function_env = List.map (fun (var_t, name) -> (name, var_t)) parameters in
+            aux function_env (statements @ [Define(var_t, "_return", returned_expr)]);
             aux env q
         in
         aux [];;

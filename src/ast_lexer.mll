@@ -9,6 +9,7 @@ rule tokenize = parse
     | [' ' '\t' '\n' '\r']                    { tokenize lexbuf }
     | "//"                                    { inline_comment lexbuf }
     | "/*"                                    { multiline_comment 1 lexbuf }
+    | "void"                                  { TVoid }
     | "int"                                   { TInt }
     | "bool"                                  { TBool }
     | '('                                     { TLeftPar }
@@ -35,6 +36,7 @@ rule tokenize = parse
     | "else"                                  { TElse }
     | "while"                                 { TWhile }
     | "for"                                   { TFor }
+    | "return"                                { TReturn }
     | (digit+ as num)                         { TIntConst(int_of_string num) }
     | "true"                                  { TBoolConst(true) }
     | "false"                                 { TBoolConst(false) }

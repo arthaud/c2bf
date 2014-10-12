@@ -344,6 +344,8 @@ let program_to_brainfuck prog =
             let bf_clean_statements = bf_clean_range offset (offset_statements - 1) in
             let bf_end, offset_end = compile_program symbols_table offset q in
             bf_statements @ bf_clean_statements @ bf_end, offset_end
+        |Function(_)::q ->
+            compile_program symbols_table offset q
     in
     fst (compile_program [] 0 prog)
 
