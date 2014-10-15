@@ -5,9 +5,10 @@ open Printf
 open Str
 
 (* print functions *)
-let string_of_type = function
+let rec string_of_type = function
     |Int -> "int"
     |Bool -> "bool"
+    |Array t -> (string_of_type t) ^ "[]"
 
 let string_of_constant = function
     |IntConst x -> string_of_int x
@@ -34,6 +35,7 @@ let rec string_of_expression = function
     |Not c -> "!(" ^ (string_of_expression c) ^ ")"
     |ReadChar -> "read_char()"
     |Call(name, arguments) -> name ^ "(" ^ (string_of_function_arguments arguments) ^ ")"
+    |ArrayAccess(name, expr) -> name ^ "[" ^ (string_of_expression expr) ^ "]"
 and
 string_of_function_arguments = function
     |[] -> ""
@@ -84,6 +86,9 @@ string_of_statement = function
         "\n\treturn " ^ (string_of_expression returned_expr) ^ ";" ^
         "\n}"
     |CallProcedure(name, arguments) -> name ^ "(" ^ (string_of_function_arguments arguments) ^ ");"
+    |DefineEmptyArray(var_t, size, name) -> (string_of_type var_t) ^ " " ^ name ^ "[" ^ (string_of_int size) ^ "];"
+    |DefineFullArray(var_t, name, expressions) -> (string_of_type var_t) ^ " " ^ name ^ "[] = {" ^ (string_of_function_arguments expressions) ^ "};"
+    |ArrayWrite(name, index, value) -> name ^ "[" ^ (string_of_expression index) ^ "] = " ^ (string_of_expression value) ^ ";"
 and
 string_of_program = function
     |[] -> ""
@@ -120,6 +125,10 @@ let type_of_constant = function
 
 let is_function = function
     |FunctionType _ -> true
+    |_ -> false
+
+let is_array = function
+    |Array _ -> true
     |_ -> false
 
 (* check_function_parameters : (var_type * string) list -> unit *)
@@ -196,12 +205,28 @@ let rec type_of_expression env expr =
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
             )
+        |ArrayAccess(name, expr) ->
+            (
+            try
+                match (type_of_var env name) with
+                |BasicType(Array array_type) ->
+                    if type_of_expression env expr != Int then
+                        raise (Bad_type (sprintf "array subscript is not an integer"));
+                    array_type
+                |BasicType _ -> raise (Bad_type (sprintf "variable %s is not an array" name))
+                |FunctionType _ -> raise (Bad_type (sprintf "cannot use function %s as an array" name))
+            with Not_found ->
+                raise (Bad_type (sprintf "variable %s is not defined" name))
+            )
 ;;
 
 let check_types =
     let rec aux env = function
         |[] -> ()
         |Define(var_t, name, expr)::q ->
+            if is_array var_t then
+                raise (Bad_type (sprintf "invalid initializer"));
+
             if List.mem_assoc name env then
                 raise (Bad_type (sprintf "variable %s already defined." name))
             else if not(var_t = type_of_expression env expr) then
@@ -213,6 +238,9 @@ let check_types =
                 match (type_of_var env name) with
                 |FunctionType _ -> raise (Bad_type (sprintf "%s is not a variable" name))
                 |BasicType var_t ->
+                    if is_array var_t then
+                        raise (Bad_type (sprintf "assignment to expression with array type"));
+
                     if not(var_t = type_of_expression env expr) then
                         raise (Bad_type (sprintf "expression of type %s cannot be assigned to variable %s of type %s." (string_of_type (type_of_expression env expr)) name (string_of_type var_t)))
             with Not_found ->
@@ -247,6 +275,9 @@ let check_types =
             let new_env = (name, FunctionType(None, List.map (function (var_t, _) -> var_t) parameters))::env in
             aux new_env q
         |Function(Some(var_t, returned_expr), name, parameters, statements)::q ->
+            if is_array var_t then
+                raise (Bad_type (sprintf "function %s cannot return an array." name));
+
             check_function_parameters parameters;
             let function_env = (List.map (fun (var_t, name) -> (name, BasicType var_t)) parameters) @ (List.filter (fun (_, t) -> is_function t) env) in
             aux function_env (statements @ [Define(var_t, "_return", returned_expr)]);
@@ -263,6 +294,43 @@ let check_types =
                     check_function_arguments name (parameters_types, arguments_real_types)
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
+            );
+            aux env q
+        |DefineEmptyArray(var_t, size, name)::q ->
+            if List.mem_assoc name env then
+                raise (Bad_type (sprintf "variable %s already defined." name));
+            if size < 0 then
+                raise (Bad_type (sprintf "size of array %s is negative" name));
+            if is_array var_t then
+                raise (Bad_type (sprintf "cannot define an array of arrays." name));
+
+            aux ((name, BasicType(Array var_t))::env) q
+        |DefineFullArray(var_t, name, expressions)::q ->
+            if List.mem_assoc name env then
+                raise (Bad_type (sprintf "variable %s already defined." name));
+            if is_array var_t then
+                raise (Bad_type (sprintf "cannot define an array of arrays." name));
+
+            let check_item expr =
+                if var_t != type_of_expression env expr then
+                    raise (Bad_type (sprintf "invalid conversion from %s to %s" (string_of_type (type_of_expression env expr)) (string_of_type var_t)))
+            in
+
+            List.iter check_item expressions;
+            aux ((name, BasicType(Array var_t))::env) q
+        |ArrayWrite(name, index, value)::q ->
+            (
+            try
+                match (type_of_var env name) with
+                |BasicType (Array var_t) ->
+                    if type_of_expression env index != Int then
+                        raise (Bad_type (sprintf "array subscript is not an integer"));
+                    if not(var_t = type_of_expression env value) then
+                        raise (Bad_type (sprintf "invalid conversion from %s to %s" (string_of_type (type_of_expression env value)) (string_of_type var_t)))
+                |BasicType _ -> raise (Bad_type (sprintf "%s is not an array" name))
+                |FunctionType _ -> raise (Bad_type (sprintf "%s is not a variable" name))
+            with Not_found ->
+                raise (Bad_type (sprintf "variable %s is not defined." name))
             );
             aux env q
         in
@@ -294,6 +362,8 @@ let rename_variable_expr old_name new_name =
         |And(left, right) -> And(aux left, aux right)
         |Or(left, right)  -> Or(aux left, aux right)
         |Call(name, arguments) -> Call(name, List.map aux arguments)
+        |ArrayAccess(name, e) when (name = old_name) -> ArrayAccess(new_name, aux e)
+        |ArrayAccess(name, e) -> ArrayAccess(name, aux e)
     in aux
 ;;
 
@@ -313,6 +383,12 @@ let rec rename_variable_statement old_name new_name = function
     |Block(statements) -> Block(rename_variable_prog old_name new_name statements)
     |Function(return, name, parameters, statements) -> Function(return, name, parameters, statements)
     |CallProcedure(name, arguments) -> CallProcedure(name, List.map (rename_variable_expr old_name new_name) arguments)
+    |DefineEmptyArray(var_t, size, name) when (name = old_name) -> DefineEmptyArray(var_t, size, new_name)
+    |DefineEmptyArray(var_t, size, name) -> DefineEmptyArray(var_t, size, name)
+    |DefineFullArray(var_t, name, expressions) when(name = old_name) -> DefineFullArray(var_t, new_name, List.map (rename_variable_expr old_name new_name) expressions)
+    |DefineFullArray(var_t, name, expressions) -> DefineFullArray(var_t, name, List.map (rename_variable_expr old_name new_name) expressions)
+    |ArrayWrite(name, index, value) when (name = old_name) -> ArrayWrite(new_name, rename_variable_expr old_name new_name index, rename_variable_expr old_name new_name value)
+    |ArrayWrite(name, index, value) -> ArrayWrite(name, rename_variable_expr old_name new_name index, rename_variable_expr old_name new_name value)
 
 (* rename_variable_prog : string -> string -> program -> program
  *
@@ -325,6 +401,7 @@ and rename_variable_prog old_name new_name p = List.map (rename_variable_stateme
 let default_value = function
     |Int -> IntConst 0
     |Bool -> BoolConst(false)
+    |Array _ -> failwith "unreachable"
 ;;
 
 type function_value = (var_type * expression) option * function_parameters * statement list
@@ -406,6 +483,9 @@ let inline =
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
             )
+        |ArrayAccess(name, e) ->
+            let pre_e, new_e = inline_expression env e in
+            pre_e, ArrayAccess(name, new_e)
 
     (* function_init_arguments : int -> inline_environment -> ((var_type * string) list) * (expression list) *)
     and function_init_arguments call_id env = function
@@ -415,6 +495,14 @@ let inline =
         |(var_t, name)::q1, expr::q2 ->
             let pre_expr, new_expr = inline_expression env expr in
             pre_expr @ [Define(var_t, name_local_var call_id name, new_expr)] @ (function_init_arguments call_id env (q1, q2))
+
+    (* inline_expression_list : int -> inline_environment -> expression list -> program * expression list *)
+    and inline_expression_list call_id env = function
+        |[] -> [], []
+        |expr::q ->
+            let pre, expressions = inline_expression_list call_id env q in
+            let pre_expr, new_expr = inline_expression env expr in
+            pre_expr @ pre, new_expr::expressions
 
     (* inline_program : int -> inline_environment -> program -> program *)
     and inline_program call_id env = function
@@ -504,5 +592,30 @@ let inline =
             with Not_found ->
                 raise (Bad_type (sprintf "function %s is not defined" name))
             )
+        |DefineEmptyArray(var_t, size, name)::q ->
+            let new_name = (match name.[0] with
+                |'0'..'9' -> name (* don't replace name *)
+                |_ -> name_local_var call_id name
+            ) in
+            let inlined_q = inline_program call_id env (rename_variable_prog name new_name q) in
+            DefineEmptyArray(var_t, size, new_name)::inlined_q
+        |DefineFullArray(var_t, name, expressions)::q ->
+            let new_name = (match name.[0] with
+                |'0'..'9' -> name (* don't replace name *)
+                |_ -> name_local_var call_id name
+            ) in
+            let pre_expressions, new_expressions = inline_expression_list call_id env expressions in
+            let inlined_q = inline_program call_id env (rename_variable_prog name new_name q) in
+            pre_expressions @ (DefineFullArray(var_t, new_name, new_expressions)::inlined_q)
+        |ArrayWrite(name, index, value)::q ->
+            let pre_index, new_index = inline_expression env index in
+            let pre_value, new_value = inline_expression env value in
+            let inlined_q = inline_program call_id env q in
+
+            if pre_index = [] && pre_value = [] then
+                ArrayWrite(name, new_index, new_value)::inlined_q
+            else
+                Block(pre_index @ pre_value @ [ArrayWrite(name, new_index, new_value)])::inlined_q
+
     in
     inline_program (!call_counter) []

@@ -16,6 +16,8 @@ rule tokenize = parse
     | ')'                                     { TRightPar }
     | '{'                                     { TLeftBrace }
     | '}'                                     { TRightBrace }
+    | '['                                     { TOpenBracket }
+    | ']'                                     { TCloseBracket }
     | '+'                                     { TPlus }
     | '-'                                     { TMinus }
     | '*'                                     { TMul }

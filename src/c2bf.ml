@@ -236,6 +236,20 @@ let bf_inf_eq x y temp = [
     Goto(temp); OBrac; Decr; CBrac;
     Goto(temp + 1); Decr]
 
+
+(*****************)
+(*
+x = y(z)
+
+(* precond : y = temp0 = temp1 = 0 *)
+y, temp0, temp1, t[0], ., t[1], ., ..
+z[temp1+temp0+z-]temp0[z+temp0-]  (* temp1' = z *)
+y>>[ (* while temp1 > 0 *)
+    [>>]+[<<]>>-]+[>>]<[<[<<]>+< (pointer is at y)
+ x+
+ y>>[>>]<-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]
+*)
+
 (* program_to_brainfuck : program -> brainfuck *)
 let program_to_brainfuck prog =
     (* bf_clean_range: int -> int -> brainfuck *)
@@ -313,6 +327,7 @@ let program_to_brainfuck prog =
             expr_bf @ bf_not pos (pos + 1)
         |ReadChar -> [Goto(pos); In]
         |Call _ -> failwith "cannot compile function calls"
+        |ArrayAccess(name, expr) -> failwith "TODO"
     in
     (* compile the program : (string * int) list -> int -> brainfuck * int *)
     let rec compile_program symbols_table offset = function
@@ -370,6 +385,12 @@ let program_to_brainfuck prog =
             failwith "cannot compile functions"
         |CallProcedure(_)::q ->
             failwith "cannot compile function calls"
+        |DefineEmptyArray(var_t, size, name)::q ->
+            failwith "TODO"
+        |DefineFullArray(var_t, name, expressions)::q ->
+            failwith "TODO"
+        |ArrayWrite(name, index, value)::q ->
+            failwith "TODO"
     in
     fst (compile_program [] 0 prog)
 

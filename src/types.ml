@@ -1,4 +1,7 @@
-type var_type = Int | Bool
+type var_type =
+    |Int
+    |Bool
+    |Array of var_type
 
 type constant =
     |IntConst of int
@@ -24,6 +27,7 @@ type expression =
     |Not of expression
     |ReadChar
     |Call of string * expression list
+    |ArrayAccess of string * expression
 
 type function_parameters = (var_type * string) list
 
@@ -35,8 +39,13 @@ type statement =
     |For of statement * expression * statement * statement list
     |WriteChar of expression
     |Block of statement list
+    (* functions *)
     |Function of (var_type * expression) option * string * function_parameters * statement list
               (* (returned type, returned expression), name, parameters, instructions *)
     |CallProcedure of string * expression list
+    (* arrays *)
+    |DefineEmptyArray of var_type * int * string
+    |DefineFullArray of var_type * string * expression list
+    |ArrayWrite of string * expression * expression
 
 type program = statement list

@@ -7,7 +7,7 @@
 %token <bool> TBoolConst
 %token <char> TCharConst
 %token TVoid TInt TBool
-%token TLeftPar TRightPar TLeftBrace, TRightBrace
+%token TLeftPar TRightPar TLeftBrace TRightBrace TOpenBracket TCloseBracket
 %token TPlus TMinus TMul TDiv
 %token TInf TInfEq TEq TNotEq TSup TSupEq TAnd TOr TNot
 %token TSemicolon TComma TAssign TReturn
@@ -37,9 +37,14 @@ nt_statements :
     | nt_statement nt_statements { $1::$2 }
 ;
 
-nt_type :
+nt_basic_type :
     | TInt { Int }
     | TBool { Bool }
+;
+
+nt_type :
+    | nt_basic_type { $1 }
+    | nt_basic_type TOpenBracket TCloseBracket { Array($1) }
 ;
 
 nt_function_parameters :
@@ -74,6 +79,9 @@ nt_statement :
     | nt_type TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TReturn nt_expression TSemicolon TRightBrace { Function(Some ($1, $9), $2, $4, $7) }
     | TVoid TVar TLeftPar nt_function_parameters TRightPar TLeftBrace nt_statements TRightBrace { Function(None, $2, $4, $7) }
     | TVar TLeftPar nt_function_arguments TRightPar TSemicolon { CallProcedure($1, $3) }
+    | nt_type TVar TOpenBracket TIntConst TCloseBracket TSemicolon { DefineEmptyArray($1, $4, $2) }
+    | nt_type TVar TOpenBracket TCloseBracket TAssign TLeftBrace nt_function_arguments TRightBrace TSemicolon { DefineFullArray($1, $2, $7) }
+    | TVar TOpenBracket nt_expression TCloseBracket TAssign nt_expression TSemicolon { ArrayWrite($1, $3, $6) }
 ;
 
 nt_expression :
@@ -98,4 +106,5 @@ nt_expression :
     | nt_expression TSupEq nt_expression { SupEq($1, $3) }
     | TReadChar TLeftPar TRightPar { ReadChar }
     | TVar TLeftPar nt_function_arguments TRightPar { Call($1, $3) }
+    | TVar TOpenBracket nt_expression TCloseBracket { ArrayAccess($1, $3) }
 ;
