@@ -14,7 +14,7 @@ How to use
 usage: `./c2bf.native [options] <C source-file>`.
 The brainfuck output is in `a.bf`.
 
-I recommend you beef [http://kiyuko.org/software/beef] (available on Archlinux) as a brainfuck interpreter.
+I recommend you beef [http://kiyuko.org/software/beef](http://kiyuko.org/software/beef) as a brainfuck interpreter.
 
 See `./c2bf.native --help` for options.
 
