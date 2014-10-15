@@ -302,14 +302,14 @@ let check_types =
             if size < 0 then
                 raise (Bad_type (sprintf "size of array %s is negative" name));
             if is_array var_t then
-                raise (Bad_type (sprintf "cannot define an array of arrays." name));
+                raise (Bad_type "cannot define an array of arrays.");
 
             aux ((name, BasicType(Array var_t))::env) q
         |DefineFullArray(var_t, name, expressions)::q ->
             if List.mem_assoc name env then
                 raise (Bad_type (sprintf "variable %s already defined." name));
             if is_array var_t then
-                raise (Bad_type (sprintf "cannot define an array of arrays." name));
+                raise (Bad_type "cannot define an array of arrays.");
 
             let check_item expr =
                 if var_t != type_of_expression env expr then
