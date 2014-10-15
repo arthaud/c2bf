@@ -396,9 +396,20 @@ let program_to_brainfuck prog =
 
 let usage = "usage: c2bf [options] <source-file>"
 
+exception ParseError of string
+
 let main filename =
     let lexbuf = Lexing.from_channel (open_in filename) in
-    let prog = program_of_lexbuf lexbuf in
+    let prog = (
+        try
+            program_of_lexbuf lexbuf
+        with Parsing.Parse_error ->
+            let curr = lexbuf.Lexing.lex_curr_p in
+            let line = curr.Lexing.pos_lnum in
+            let pos = curr.Lexing.pos_cnum - curr.Lexing.pos_bol in
+            let token = Lexing.lexeme lexbuf in
+            raise (ParseError (sprintf "Line %d Position %d Token %s" line pos token))
+    ) in
 
     (* debug *)
     if !Options.debug then
