@@ -6,6 +6,7 @@
 %token <int> TIntConst
 %token <bool> TBoolConst
 %token <char> TCharConst
+%token <string> TStringConst
 %token TVoid TInt TBool
 %token TLeftPar TRightPar TLeftBrace TRightBrace TOpenBracket TCloseBracket
 %token TPlus TMinus TMul TDiv
@@ -81,6 +82,7 @@ nt_statement :
     | TVar TLeftPar nt_function_arguments TRightPar TSemicolon { CallProcedure($1, $3) }
     | nt_type TVar TOpenBracket TIntConst TCloseBracket TSemicolon { DefineEmptyArray($1, $4, $2) }
     | nt_type TVar TOpenBracket TCloseBracket TAssign TLeftBrace nt_function_arguments TRightBrace TSemicolon { DefineFullArray($1, $2, $7) }
+    | nt_type TVar TOpenBracket TCloseBracket TAssign TStringConst TSemicolon { DefineCharArray($2, $6) }
     | TVar TOpenBracket nt_expression TCloseBracket TAssign nt_expression TSemicolon { ArrayWrite($1, $3, $6) }
 ;
 

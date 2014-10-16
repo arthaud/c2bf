@@ -46,6 +46,7 @@ type statement =
     (* arrays *)
     |DefineEmptyArray of var_type * int * string
     |DefineFullArray of var_type * string * expression list
+    |DefineCharArray of string * string
     |ArrayWrite of string * expression * expression
 
 type program = statement list

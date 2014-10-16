@@ -88,6 +88,7 @@ string_of_statement = function
     |CallProcedure(name, arguments) -> name ^ "(" ^ (string_of_function_arguments arguments) ^ ");"
     |DefineEmptyArray(var_t, size, name) -> (string_of_type var_t) ^ " " ^ name ^ "[" ^ (string_of_int size) ^ "];"
     |DefineFullArray(var_t, name, expressions) -> (string_of_type var_t) ^ " " ^ name ^ "[] = {" ^ (string_of_function_arguments expressions) ^ "};"
+    |DefineCharArray(name, value) -> "int " ^ name ^ "[] = \"" ^ value ^ "\";"
     |ArrayWrite(name, index, value) -> name ^ "[" ^ (string_of_expression index) ^ "] = " ^ (string_of_expression value) ^ ";"
 and
 string_of_program = function
@@ -318,6 +319,11 @@ let check_types =
 
             List.iter check_item expressions;
             aux ((name, BasicType(Array var_t))::env) q
+        |DefineCharArray(name, value)::q ->
+            if List.mem_assoc name env then
+                raise (Bad_type (sprintf "variable %s already defined." name));
+
+            aux ((name, BasicType(Array Int))::env) q
         |ArrayWrite(name, index, value)::q ->
             (
             try
@@ -387,6 +393,8 @@ let rec rename_variable_statement old_name new_name = function
     |DefineEmptyArray(var_t, size, name) -> DefineEmptyArray(var_t, size, name)
     |DefineFullArray(var_t, name, expressions) when(name = old_name) -> DefineFullArray(var_t, new_name, List.map (rename_variable_expr old_name new_name) expressions)
     |DefineFullArray(var_t, name, expressions) -> DefineFullArray(var_t, name, List.map (rename_variable_expr old_name new_name) expressions)
+    |DefineCharArray(name, value) when(name = old_name) -> DefineCharArray(new_name, value)
+    |DefineCharArray(name, value) -> DefineCharArray(name, value)
     |ArrayWrite(name, index, value) when (name = old_name) -> ArrayWrite(new_name, rename_variable_expr old_name new_name index, rename_variable_expr old_name new_name value)
     |ArrayWrite(name, index, value) -> ArrayWrite(name, rename_variable_expr old_name new_name index, rename_variable_expr old_name new_name value)
 
@@ -607,6 +615,13 @@ let inline =
             let pre_expressions, new_expressions = inline_expression_list call_id env expressions in
             let inlined_q = inline_program call_id env (rename_variable_prog name new_name q) in
             pre_expressions @ (DefineFullArray(var_t, new_name, new_expressions)::inlined_q)
+        |DefineCharArray(name, value)::q ->
+            let new_name = (match name.[0] with
+                |'0'..'9' -> name (* don't replace name *)
+                |_ -> name_local_var call_id name
+            ) in
+            let inlined_q = inline_program call_id env (rename_variable_prog name new_name q) in
+            DefineCharArray(new_name, value)::inlined_q
         |ArrayWrite(name, index, value)::q ->
             let pre_index, new_index = inline_expression env index in
             let pre_value, new_value = inline_expression env value in

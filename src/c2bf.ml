@@ -58,13 +58,19 @@ let compile_brainfuck =
 let repeat x n =                      
     let rec aux p accu =
         if p = 0 then accu else aux (p-1) (x::accu) in
-    aux n []
+    aux n [];;
 
 (* range : int -> int -> int list *)
 let range a b =
     let rec aux accu p =
         if p < a then accu else aux (p::accu) (p-1) in
     aux [] b;;
+
+(* charlist_of_string : string -> char list *)
+let charlist_of_string s =
+    let rec aux i l =
+        if i < 0 then l else aux (i - 1) (s.[i]::l) in
+    aux (String.length s - 1) [];;
 
 (* helpful operations *)
 (* see http://esolangs.org/wiki/Brainfuck_algorithms *)
@@ -409,6 +415,15 @@ let program_to_brainfuck prog =
                     bf_expr @ bf_end, offset_end
             in
             aux (offset + 3) expressions
+        |DefineCharArray(name, value)::q ->
+            let rec aux current_offset = function
+                |[] -> compile_program ((name, offset)::symbols_table) (current_offset + 2) q
+                |c::chars ->
+                    let bf_char = bf_generate (int_of_char c) current_offset in
+                    let bf_end, offset_end = aux (current_offset + 2) chars in
+                    bf_char @ bf_end, offset_end
+            in
+            aux (offset + 3) (charlist_of_string value)
         |ArrayWrite(name, index, value)::q ->
             let array_pos = List.assoc name symbols_table in
             let bf_index = compile_expression symbols_table offset index in

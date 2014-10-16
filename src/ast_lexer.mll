@@ -48,6 +48,7 @@ rule tokenize = parse
     | "'\\r'"                                 { TCharConst('\r') }
     | "read_char"                             { TReadChar }
     | "write_char"                            { TWriteChar }
+    | '"'                                     { const_string (Buffer.create 16) lexbuf }
     | ident as var_name                       { TVar(var_name) }
     | eof                                     { TEOF }
 and
@@ -61,3 +62,15 @@ multiline_comment depth = parse
     | "/*"                                    { multiline_comment (depth + 1) lexbuf }
     | eof                                     { TEOF }
     | _                                       { multiline_comment depth lexbuf }
+and
+const_string buf = parse
+    | '"'             { TStringConst (Buffer.contents buf) }
+    | '\\' '/'        { Buffer.add_char buf '/'; const_string buf lexbuf }
+    | '\\' '\\'       { Buffer.add_char buf '\\'; const_string buf lexbuf }
+    | '\\' 'b'        { Buffer.add_char buf '\b'; const_string buf lexbuf }
+    | '\\' 'f'        { Buffer.add_char buf '\012'; const_string buf lexbuf }
+    | '\\' 'n'        { Buffer.add_char buf '\n'; const_string buf lexbuf }
+    | '\\' 'r'        { Buffer.add_char buf '\r'; const_string buf lexbuf }
+    | '\\' 't'        { Buffer.add_char buf '\t'; const_string buf lexbuf }
+    | '\\' '"'        { Buffer.add_char buf '"'; const_string buf lexbuf }
+    | [^ '"' '\\']+   { Buffer.add_string buf (Lexing.lexeme lexbuf); const_string buf lexbuf }
