@@ -236,19 +236,28 @@ let bf_inf_eq x y temp = [
     Goto(temp); OBrac; Decr; CBrac;
     Goto(temp + 1); Decr]
 
+(* bf_array_write : int -> int -> int -> brainfuck
+ * x[y] = z
+ *
+ * precondition : x = x + 1 = x + 2 = 0
+ * postcondition : x' = x' + 1 = x' + 2 = y' = z' = 0 *)
+let bf_array_write x y z =
+    bf_move y (x + 2)
+    @ bf_move z (x + 1)
+    @ [Goto(x); Debug(">>[[>>]+[<<]>>-]+[>>]<[-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]")]
 
-(*****************)
-(*
-x = y(z)
-
-(* precond : y = temp0 = temp1 = 0 *)
-y, temp0, temp1, t[0], ., t[1], ., ..
-z[temp1+temp0+z-]temp0[z+temp0-]  (* temp1' = z *)
-y>>[ (* while temp1 > 0 *)
-    [>>]+[<<]>>-]+[>>]<[<[<<]>+< (pointer is at y)
- x+
- y>>[>>]<-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]
-*)
+(* bf_array_access : int -> int -> int -> brainfuck
+ * x = y[z]
+ *
+ * precondition : x = y = y + 1 = y + 2 = 0
+ * postcondition : y' = y' + 1 = y' + 2 = 0, z' = 0 *)
+let bf_array_access x y z =
+    bf_move z (y + 2)
+    @ [
+        Goto(y); Debug(">>[[>>]+[<<]>>-]+[>>]<[<[<<]>+<");
+        Goto(x); Incr;
+        Goto(y); Debug(">>[>>]<-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]")
+    ]
 
 (* program_to_brainfuck : program -> brainfuck *)
 let program_to_brainfuck prog =
@@ -327,7 +336,10 @@ let program_to_brainfuck prog =
             expr_bf @ bf_not pos (pos + 1)
         |ReadChar -> [Goto(pos); In]
         |Call _ -> failwith "cannot compile function calls"
-        |ArrayAccess(name, expr) -> failwith "TODO"
+        |ArrayAccess(name, expr) ->
+            let array_pos = List.assoc name symbols_table in
+            let expr_bf = compile_expression symbols_table (pos + 1) expr in
+            expr_bf @ bf_array_access pos array_pos (pos + 1)
     in
     (* compile the program : (string * int) list -> int -> brainfuck * int *)
     let rec compile_program symbols_table offset = function
@@ -386,11 +398,23 @@ let program_to_brainfuck prog =
         |CallProcedure(_)::q ->
             failwith "cannot compile function calls"
         |DefineEmptyArray(var_t, size, name)::q ->
-            failwith "TODO"
+            let real_size = 3 + 2 * size in
+            compile_program ((name, offset)::symbols_table) (offset + real_size) q
         |DefineFullArray(var_t, name, expressions)::q ->
-            failwith "TODO"
+            let rec aux current_offset = function
+                |[] -> compile_program ((name, offset)::symbols_table) current_offset q
+                |expr::expressions_q ->
+                    let bf_expr = compile_expression symbols_table current_offset expr in
+                    let bf_end, offset_end = aux (current_offset + 2) expressions_q in
+                    bf_expr @ bf_end, offset_end
+            in
+            aux (offset + 3) expressions
         |ArrayWrite(name, index, value)::q ->
-            failwith "TODO"
+            let array_pos = List.assoc name symbols_table in
+            let bf_index = compile_expression symbols_table offset index in
+            let bf_value = compile_expression symbols_table (offset + 1) value in
+            let bf_end, offset_end = compile_program symbols_table offset q in
+            bf_index @ bf_value @ (bf_array_write array_pos offset (offset + 1)) @ bf_end, offset_end
     in
     fst (compile_program [] 0 prog)
 
