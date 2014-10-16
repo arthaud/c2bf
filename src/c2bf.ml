@@ -350,6 +350,12 @@ let program_to_brainfuck prog =
     (* compile the program : (string * int) list -> int -> brainfuck * int *)
     let rec compile_program symbols_table offset = function
         |[] -> [], offset
+
+        (* special case *)
+        |Define(Array _, new_name, Var old_name)::q ->
+            let array_pos = List.assoc old_name symbols_table in
+            compile_program ((new_name, array_pos)::symbols_table) offset q
+
         |Define(_, name, expr)::q ->
             let bf_expr = compile_expression symbols_table offset expr in
             let bf_end, offset_end = compile_program ((name, offset)::symbols_table) (offset + 1) q in
