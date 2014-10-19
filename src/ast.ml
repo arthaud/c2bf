@@ -23,6 +23,7 @@ let rec string_of_expression = function
     |Sub(left, right) -> "(" ^ (string_of_expression left) ^ ") - (" ^ (string_of_expression right) ^ ")"
     |Mul(left, right) -> "(" ^ (string_of_expression left) ^ ") * (" ^ (string_of_expression right) ^ ")"
     |Div(left, right) -> "(" ^ (string_of_expression left) ^ ") / (" ^ (string_of_expression right) ^ ")"
+    |Xor(left, right) -> "(" ^ (string_of_expression left) ^ ") ^ (" ^ (string_of_expression right) ^ ")"
     |Minus expr -> "-(" ^ (string_of_expression expr) ^ ")"
     |Inf(left, right)   -> "(" ^ (string_of_expression left) ^ ") < ("  ^ (string_of_expression right) ^ ")"
     |InfEq(left, right) -> "(" ^ (string_of_expression left) ^ ") <= ("  ^ (string_of_expression right) ^ ")"
@@ -182,6 +183,7 @@ let rec type_of_expression env expr =
         |Sub(left, right) -> type_of_binary_expr "subtract" Int Int left right
         |Mul(left, right) -> type_of_binary_expr "multiply" Int Int left right
         |Div(left, right) -> type_of_binary_expr "divide" Int Int left right
+        |Xor(left, right) -> type_of_binary_expr "xor" Int Int left right
         |Minus expr       -> type_of_unary_expr "use operator - on" Int Int expr
         |Inf(left, right)   -> type_of_binary_expr "use operator < on" Int Bool left right
         |InfEq(left, right) -> type_of_binary_expr "use operator <= on" Int Bool left right
@@ -359,6 +361,7 @@ let rename_variable_expr old_name new_name =
         |Sub(left, right) -> Sub(aux left, aux right)
         |Mul(left, right) -> Mul(aux left, aux right)
         |Div(left, right) -> Div(aux left, aux right)
+        |Xor(left, right) -> Xor(aux left, aux right)
         |Inf(left, right)   -> Inf(aux left, aux right)
         |InfEq(left, right) -> InfEq(aux left, aux right)
         |Eq(left, right)    -> Eq(aux left, aux right)
@@ -455,6 +458,7 @@ let inline =
         |Sub(left, right) -> inline_binary_expr left right (fun x y -> Sub(x, y))
         |Mul(left, right) -> inline_binary_expr left right (fun x y -> Mul(x, y))
         |Div(left, right) -> inline_binary_expr left right (fun x y -> Div(x, y))
+        |Xor(left, right) -> inline_binary_expr left right (fun x y -> Xor(x, y))
         |Inf(left, right)   -> inline_binary_expr left right (fun x y -> Inf(x, y))
         |InfEq(left, right) -> inline_binary_expr left right (fun x y -> InfEq(x, y))
         |Eq(left, right)    -> inline_binary_expr left right (fun x y -> Eq(x, y))

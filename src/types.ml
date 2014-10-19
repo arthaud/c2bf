@@ -15,6 +15,7 @@ type expression =
     |Sub of expression * expression
     |Mul of expression * expression
     |Div of expression * expression
+    |Xor of expression * expression
     |Minus of expression
     |Inf of expression * expression
     |InfEq of expression * expression

@@ -265,6 +265,18 @@ let bf_array_access x y z =
         Goto(y); Debug(">>[>>]<-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]")
     ]
 
+(* bf_xor : int -> brainfuck
+ * mem[x] = mem[x + 1] XOR mem[x + 2]
+ *
+ * precondition: mem[x] = 0 && forall y > x +2, mem[y] = 0
+ * postcondition: mem[x]' = mem[x + 1] XOR mem[x + 2] && forall y > x, mem[y] = 0 *)
+let bf_xor x = [
+    Goto(x);
+    Debug("-[[>>>>>>[>>>]++[-<<<]<<<-]>]>>>[<]>[[>[>-<-]>[<<<<<<+>>>>>>[-]]>]+[<[<<<++>>>-]<<]>>]<<<");
+    Debug("[<<+>>-]"); (* bf_move (x+2) x *)
+    Debug(">>>>[>>>]<<<[-<<<]<<<") (* clean *)
+    ]
+
 (* program_to_brainfuck : program -> brainfuck *)
 let program_to_brainfuck prog =
     (* bf_clean_range: int -> int -> brainfuck *)
@@ -304,6 +316,10 @@ let program_to_brainfuck prog =
             let left_bf = compile_expression symbols_table pos left in
             let right_bf = compile_expression symbols_table (pos + 1) right in
             left_bf @ right_bf @ bf_div pos (pos + 1) (pos + 2) (pos + 3) (pos + 4) (pos + 5) @ bf_clean (pos + 1)
+        |Xor(left, right) ->
+            let left_bf = compile_expression symbols_table (pos + 1) left in
+            let right_bf = compile_expression symbols_table (pos + 2) right in
+            left_bf @ right_bf @ bf_xor pos
         |Minus expr ->
             let expr_bf = compile_expression symbols_table pos expr in
             expr_bf @ bf_minus pos (pos + 1)

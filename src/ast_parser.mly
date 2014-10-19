@@ -9,7 +9,7 @@
 %token <string> TStringConst
 %token TVoid TInt TBool
 %token TLeftPar TRightPar TLeftBrace TRightBrace TOpenBracket TCloseBracket
-%token TPlus TMinus TMul TDiv
+%token TPlus TMinus TMul TDiv TXor
 %token TInf TInfEq TEq TNotEq TSup TSupEq TAnd TOr TNot
 %token TSemicolon TComma TAssign TReturn
 %token TIf TElse TWhile TFor
@@ -21,6 +21,7 @@
 
 %left TOr
 %left TAnd
+%left TXor
 %left TInf TInfEq TEq TNotEq TSup TSupEq
 %left TPlus TMinus
 %left TMul TDiv
@@ -97,6 +98,7 @@ nt_expression :
     | nt_expression TMinus nt_expression { Sub($1, $3) }
     | nt_expression TMul nt_expression { Mul($1, $3) }
     | nt_expression TDiv nt_expression { Div($1, $3) }
+    | nt_expression TXor nt_expression { Xor($1, $3) }
     | TNot nt_expression { Not($2) }
     | nt_expression TOr nt_expression { Or($1, $3) }
     | nt_expression TAnd nt_expression { And($1, $3) }

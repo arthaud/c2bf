@@ -22,6 +22,7 @@ rule tokenize = parse
     | '-'                                     { TMinus }
     | '*'                                     { TMul }
     | '/'                                     { TDiv }
+    | '^'                                     { TXor }
     | '<'                                     { TInf }
     | "<="                                    { TInfEq }
     | "=="                                    { TEq }
