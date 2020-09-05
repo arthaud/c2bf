@@ -3,6 +3,21 @@ c2bf
 
 **c2bf** is a compiler from a subset of C to brainfuck.
 
+Dependencies
+------------
+
+You will need `ocamlbuild` and `ocamlfind`.
+
+#### Ubuntu
+
+To install the dependencies on Ubuntu, run the following commands:
+```
+$ sudo apt install opam ocamlbuild
+$ opam init
+$ eval $(opam config env)
+$ opam install ocamlfind
+```
+
 Build
 -----
 
