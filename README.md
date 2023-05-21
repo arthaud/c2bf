@@ -17,6 +17,12 @@ $ opam init
 $ eval $(opam config env)
 $ opam install ocamlfind
 ```
+#### macOS
+
+To install the dependencies on macOS, run the following commands:
+```
+$ brew install ocaml ocamlbuild ocaml-findlib
+```
 
 Build
 -----
